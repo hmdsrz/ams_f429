@@ -158,7 +158,8 @@ static const int as7265x_unordered_channel_wavelength[] = {
 static const int as7265x_ordered_channel_wavelength[] = {
 	410, 435, 460, 485, 510, 535, 560, 585, 610, 645, 680, 705, 730, 760, 810, 860, 900, 940
 };
-
+uint8_t i2cm_read(I2C_HandleTypeDef *hi2c, uint8_t addr);
+void 	i2cm_write(I2C_HandleTypeDef *hi2c, uint8_t addr, uint8_t value);
 int     as7265x_is_data_available(I2C_HandleTypeDef *hi2c);
 void    as7265x_set_gain(I2C_HandleTypeDef *hi2c, int gain);
 void    as7265x_set_integration_time(I2C_HandleTypeDef *hi2c, uint8_t time);

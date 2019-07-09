@@ -42,30 +42,51 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c2;
+
+TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
 as7265x_channels_t calibrated_channels;
 as7265x_raw_channels_t raw_channels;
+
+uint16_t i2c_status;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_I2C1_Init(void);
+static void MX_I2C2_Init(void);
+static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
 
 void as7265x_init(void)
 {
-	as7265x_indicator_disable(&hi2c1);
-	as7265x_set_gain (&hi2c1, AS7265X_GAIN_16X);
-	as7265x_set_integration_time (&hi2c1, 200); //integration_time: 1-255 in 2.8ms units
+	as7265x_indicator_disable(&hi2c2);
+	as7265x_set_gain (&hi2c2, AS7265X_GAIN_1X);
+	as7265x_set_integration_time (&hi2c2, 25); //integration_time: 1-255 in 2.8ms units
 }
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if(htim->Instance == TIM7)
+	    {
+		as7265x_set_measurement_mode(&hi2c2, AS7265X_MEASUREMENT_MODE_6CHAN_ONE_SHOT);
 
+		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
+
+		as7265x_get_all_calibrated_values(&hi2c2, &calibrated_channels);
+
+//		as7265x_order_calibrated_channels(&hi2c2, &calibrated_channels);
+//
+//		as7265x_get_all_raw_values(&hi2c2, &raw_channels);
+//
+//		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
+	    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -97,43 +118,49 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_I2C1_Init();
+  MX_I2C2_Init();
+  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
-
   as7265x_init();
+
+//  HAL_TIM_Base_Start_IT(&htim7);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
 		// trigger one-shot conversion
-		as7265x_set_measurement_mode(&hi2c1, AS7265X_MEASUREMENT_MODE_6CHAN_CONTINUOUS);
+		as7265x_set_measurement_mode(&hi2c2, AS7265X_MEASUREMENT_MODE_6CHAN_ONE_SHOT);
 
 		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
+
+//
+//		if(HAL_I2C_IsDeviceReady(&hi2c2,(uint16_t) 0x49 << 1,2,100) == HAL_OK)
+//		    {
+//			HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
+//			HAL_Delay(300);
+////			HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
+//		    }
+
 		// wait for data available : TODO: should delay in loop to reduce I2C bus traffic
-		while (!as7265x_is_data_available(&hi2c1) )
-		{
+		while (!as7265x_is_data_available(&hi2c2)) HAL_Delay(5);
 
-		HAL_Delay(100);
 		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
-		as7265x_get_all_calibrated_values(&hi2c1, &calibrated_channels);
+		as7265x_get_all_calibrated_values(&hi2c2, &calibrated_channels);
 
-//		as7265x_order_calibrated_channels(&hi2c1, &calibrated_channels);
+		as7265x_order_calibrated_channels(&hi2c2, &calibrated_channels);
 
-		as7265x_get_all_raw_values(&hi2c1, &raw_channels);
+		as7265x_get_all_raw_values(&hi2c2, &raw_channels);
 
-		}
+    }
 
-		HAL_Delay(100);
+//		HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-
-  }
-  as7265x_soft_reset(&hi2c1);
+  as7265x_soft_reset(&hi2c2);
   /* USER CODE END 3 */
 }
 
@@ -186,48 +213,86 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
+  * @brief I2C2 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_I2C1_Init(void)
+static void MX_I2C2_Init(void)
 {
 
-  /* USER CODE BEGIN I2C1_Init 0 */
+  /* USER CODE BEGIN I2C2_Init 0 */
 
-  /* USER CODE END I2C1_Init 0 */
+  /* USER CODE END I2C2_Init 0 */
 
-  /* USER CODE BEGIN I2C1_Init 1 */
+  /* USER CODE BEGIN I2C2_Init 1 */
 
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.ClockSpeed = 100000;
+  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
   {
     Error_Handler();
   }
   /** Configure Analogue filter 
   */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
   {
     Error_Handler();
   }
   /** Configure Digital filter 
   */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN I2C1_Init 2 */
+  /* USER CODE BEGIN I2C2_Init 2 */
 
-  /* USER CODE END I2C1_Init 2 */
+  /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 149;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 0;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
 
 }
 
@@ -241,9 +306,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_13|GPIO_PIN_14, GPIO_PIN_RESET);
