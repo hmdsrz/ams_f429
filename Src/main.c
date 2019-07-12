@@ -34,6 +34,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define BANDWIDTH 25
+#define lambda_50nm 50
+#define GAIN 16
+#define SURFACE_DIFFUSER 6.09
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -49,8 +54,18 @@ TIM_HandleTypeDef htim7;
 /* USER CODE BEGIN PV */
 as7265x_channels_t calibrated_channels;
 as7265x_raw_channels_t raw_channels;
+as7265x_named_channels_t named_channels;
 
 uint16_t i2c_status;
+uint8_t sort_flag = 0;
+
+struct calibrated_channel
+{
+    float nm410, nm435, nm460, nm485, nm510, nm535, nm560,
+    nm585, nm610, nm645, nm680, nm705, nm730, nm760, nm810, nm860, nm900, nm940, intensity, intensity_per_bw;
+};
+
+struct calibrated_channel calibrated_channel;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,8 +78,8 @@ static void MX_TIM7_Init(void);
 void as7265x_init(void)
 {
 	as7265x_indicator_disable(&hi2c2);
-	as7265x_set_gain (&hi2c2, AS7265X_GAIN_1X);
-	as7265x_set_integration_time (&hi2c2, 25); //integration_time: 1-255 in 2.8ms units
+	as7265x_set_gain (&hi2c2, AS7265X_GAIN_16X);
+	as7265x_set_integration_time (&hi2c2, 59); //integration_time: 1-255 in 2.8ms units
 }
 /* USER CODE END PFP */
 
@@ -75,16 +90,59 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if(htim->Instance == TIM7)
 	    {
 		as7265x_set_measurement_mode(&hi2c2, AS7265X_MEASUREMENT_MODE_6CHAN_ONE_SHOT);
-
+//
 		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
 
+		while (!as7265x_is_data_available(&hi2c2))
+		    {
+
+		    }
+//
 		as7265x_get_all_calibrated_values(&hi2c2, &calibrated_channels);
+
+		calibrated_channel.nm410 = calibrated_channels.channel[12];
+		calibrated_channel.nm435 = calibrated_channels.channel[13];
+		calibrated_channel.nm460 = calibrated_channels.channel[14];
+		calibrated_channel.nm485 = calibrated_channels.channel[15];
+		calibrated_channel.nm510 = calibrated_channels.channel[16];
+		calibrated_channel.nm535 = calibrated_channels.channel[17];
+
+		calibrated_channel.nm560 = calibrated_channels.channel[6];
+		calibrated_channel.nm585 = calibrated_channels.channel[7];
+		calibrated_channel.nm610 = calibrated_channels.channel[0];
+		calibrated_channel.nm645 = calibrated_channels.channel[8];
+		calibrated_channel.nm680 = calibrated_channels.channel[1];
+		calibrated_channel.nm705 = calibrated_channels.channel[9];
+
+		calibrated_channel.nm730 = calibrated_channels.channel[2];
+		calibrated_channel.nm760 = calibrated_channels.channel[3];
+		calibrated_channel.nm810 = calibrated_channels.channel[4];
+		calibrated_channel.nm860 = calibrated_channels.channel[5];
+		calibrated_channel.nm900 = calibrated_channels.channel[10];
+		calibrated_channel.nm940 = calibrated_channels.channel[11];
+
+		calibrated_channel.intensity = ((calibrated_channel.nm410 + calibrated_channel.nm435)*12.5) + ((calibrated_channel.nm435 + calibrated_channel.nm460)*12.5) +
+			((calibrated_channel.nm460 + calibrated_channel.nm485)*12.5) + ((calibrated_channel.nm485 + calibrated_channel.nm510)*12.5) +
+			((calibrated_channel.nm510 + calibrated_channel.nm535)*12.5) + ((calibrated_channel.nm535 + calibrated_channel.nm560)*12.5) +
+			((calibrated_channel.nm560 + calibrated_channel.nm585)*12.5) + ((calibrated_channel.nm585 + calibrated_channel.nm610)*12.5) +
+			((calibrated_channel.nm610 + calibrated_channel.nm645)*12.5) + ((calibrated_channel.nm645 + calibrated_channel.nm680)*12.5) +
+			((calibrated_channel.nm680 + calibrated_channel.nm705)*12.5) + ((calibrated_channel.nm705 + calibrated_channel.nm730)*12.5) +
+			((calibrated_channel.nm730 + calibrated_channel.nm760)*12.5) + ((calibrated_channel.nm760 + calibrated_channel.nm810)*12.5) +
+			((calibrated_channel.nm810 + calibrated_channel.nm860)*12.5) + ((calibrated_channel.nm860 + calibrated_channel.nm900)*12.5) +
+			((calibrated_channel.nm900 + calibrated_channel.nm940)*12.5);
+
+		calibrated_channel.intensity /= GAIN;
+
+		calibrated_channel.intensity /=SURFACE_DIFFUSER;
+
+		calibrated_channel.intensity_per_bw = calibrated_channel.intensity / lambda_50nm;
+
 
 //		as7265x_order_calibrated_channels(&hi2c2, &calibrated_channels);
 //
 //		as7265x_get_all_raw_values(&hi2c2, &raw_channels);
 //
-//		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
+		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
 	    }
 }
 /* USER CODE END 0 */
@@ -123,7 +181,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   as7265x_init();
 
-//  HAL_TIM_Base_Start_IT(&htim7);
+  HAL_TIM_Base_Start_IT(&htim7);
 
   /* USER CODE END 2 */
 
@@ -132,27 +190,31 @@ int main(void)
   while (1)
   {
 		// trigger one-shot conversion
-		as7265x_set_measurement_mode(&hi2c2, AS7265X_MEASUREMENT_MODE_6CHAN_ONE_SHOT);
-
-		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
-
+//		as7265x_set_measurement_mode(&hi2c2, AS7265X_MEASUREMENT_MODE_6CHAN_ONE_SHOT);
 //
-//		if(HAL_I2C_IsDeviceReady(&hi2c2,(uint16_t) 0x49 << 1,2,100) == HAL_OK)
-//		    {
-//			HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
-//			HAL_Delay(300);
+//		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
+//
+////		if(HAL_I2C_IsDeviceReady(&hi2c2,(uint16_t) 0x92,2,100) == HAL_OK)
+////		    {
 ////			HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_14);
-//		    }
-
-		// wait for data available : TODO: should delay in loop to reduce I2C bus traffic
-		while (!as7265x_is_data_available(&hi2c2)) HAL_Delay(5);
-
-		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
-		as7265x_get_all_calibrated_values(&hi2c2, &calibrated_channels);
-
-		as7265x_order_calibrated_channels(&hi2c2, &calibrated_channels);
-
-		as7265x_get_all_raw_values(&hi2c2, &raw_channels);
+////			HAL_Delay(300);
+////		    }
+////			else if(HAL_I2C_IsDeviceReady(&hi2c2,(uint16_t) 0x93,2,100) == HAL_OK)
+////			    {
+////				HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
+////				HAL_Delay(300);
+////			    }
+////
+//		// wait for data available : TODO: should delay in loop to reduce I2C bus traffic
+//		while (!as7265x_is_data_available(&hi2c2))  HAL_Delay(5);
+//
+//
+//		as7265x_get_all_calibrated_values(&hi2c2, &calibrated_channels);
+//
+////		as7265x_get_ordered_channel_wavelengths();
+//		as7265x_order_calibrated_channels(&hi2c2, &calibrated_channels);
+//
+//		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
 
     }
 
@@ -179,11 +241,12 @@ void SystemClock_Config(void)
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
   /** Initializes the CPU, AHB and APB busses clocks 
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 180;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
@@ -276,9 +339,9 @@ static void MX_TIM7_Init(void)
 
   /* USER CODE END TIM7_Init 1 */
   htim7.Instance = TIM7;
-  htim7.Init.Prescaler = 149;
+  htim7.Init.Prescaler = 299;
   htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim7.Init.Period = 0;
+  htim7.Init.Period = 60000;
   htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
   {
