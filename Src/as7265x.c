@@ -20,7 +20,7 @@
 
 #define AS7265X_I2C_ADDR 0x49
 
-I2C_HandleTypeDef hi2c2;
+I2C_HandleTypeDef hi2c3;
 
 /**
  * Read a I2C (real) register from AS7265x
